@@ -21,22 +21,17 @@ public class Task {
 
     private String title;
     private String description;
-    private String status;       // "todo" | "inprogress" | "done"
+    private String status;       
     private String tag;
-    private String priority;     // "urgent" | "medium" | "low"
+    private String priority;     
 
     private Instant createdAt;
-    private Instant updatedAt;   // updated every time status changes via drag-and-drop
+    private Instant updatedAt;   
 
-    // Full audit log of every status change with its timestamp
     private List<StatusHistory> statusHistory = new ArrayList<>();
 
-    // --- Phase 2 hook: enabled for tokenization ---
     private String userId;
 
-    // ---------------------------------------------------------------
-    // Inner class: one entry per status change
-    // ---------------------------------------------------------------
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

@@ -45,7 +45,7 @@ public class AuthService {
 
         Map<String, Object> response = new HashMap<>();
         response.put("token", token);
-        response.put("user", user); // You may want to strip the password here in production
+        response.put("user", user); 
         return response;
     }
 
