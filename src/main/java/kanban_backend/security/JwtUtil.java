@@ -10,14 +10,21 @@ import java.security.Key;
 import java.util.Date;
 import java.util.function.Function;
 
+import org.springframework.beans.factory.annotation.Value;
+import jakarta.annotation.PostConstruct; 
+
 @Component
 public class JwtUtil {
 
-    // Must be at least 256 bits (32 bytes)
-    private static final String SECRET_KEY_STRING = "MySuperSecretKeyForKanbanBoardApplication12345!";
-    private final Key key = Keys.hmacShaKeyFor(SECRET_KEY_STRING.getBytes());
+    @Value("${jwt.secret}")
+    private String secretKeyString;
+    
+    private Key key; 
+    @PostConstruct
+    public void init() {
+        this.key = Keys.hmacShaKeyFor(secretKeyString.getBytes());
+    }
 
-    // Token valid for 24 hours
     private static final long EXPIRATION_TIME = 1000 * 60 * 60 * 24L;
 
     public String generateToken(String email) {
