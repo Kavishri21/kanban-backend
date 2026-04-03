@@ -35,6 +35,7 @@ public class SecurityConfig {
             .cors(Customizer.withDefaults()) // Integrates with our existing CorsConfig
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll() // Login and signup are public
+                .requestMatchers("/error").permitAll() // ALWAYS allow spring to return the actual error!
                 .requestMatchers("/api/tasks/**").authenticated() // Tasks require token
                 .anyRequest().authenticated()
             )
