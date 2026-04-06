@@ -28,26 +28,31 @@ public class TaskService {
     }
 
     public Task createTask(Task task, String userEmail) {
+        kanban_backend.model.User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
         Instant now = Instant.now();
         task.setCreatedAt(now);
         task.setUpdatedAt(now);
         task.setStatus("todo"); 
-        task.setUserId(getUserId(userEmail)); 
+        task.setUserId(user.getId()); 
 
-        task.getStatusHistory().add(new Task.StatusHistory("todo", now));
+        task.getStatusHistory().add(new Task.StatusHistory("todo", now, user.getName()));
 
         return taskRepository.save(task);
     }
 
-    public Task updateStatus(String id, String newStatus) {
+    public Task updateStatus(String id, String newStatus, String userEmail) {
         Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Task not found: " + id));
+        kanban_backend.model.User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
         Instant now = Instant.now();
         task.setStatus(newStatus);
         task.setUpdatedAt(now);
 
-        task.getStatusHistory().add(new Task.StatusHistory(newStatus, now));
+        task.getStatusHistory().add(new Task.StatusHistory(newStatus, now, user.getName()));
 
         return taskRepository.save(task);
     }

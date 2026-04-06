@@ -38,5 +38,6 @@ public class Task {
     public static class StatusHistory {
         private String status;
         private Instant changedAt;
+        private String changedBy;
     }
 }

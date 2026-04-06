@@ -34,14 +34,15 @@ public class TaskController {
     @PatchMapping("/{id}/status")
     public ResponseEntity<Task> updateStatus(
             @PathVariable String id,
-            @RequestBody Map<String, String> body) {
+            @RequestBody Map<String, String> body,
+            Principal principal) {
 
         String newStatus = body.get("status");
         if (newStatus == null || newStatus.isBlank()) {
             return ResponseEntity.badRequest().build();
         }
 
-        Task updated = taskService.updateStatus(id, newStatus);
+        Task updated = taskService.updateStatus(id, newStatus, principal.getName());
         return ResponseEntity.ok(updated);
     }
 
