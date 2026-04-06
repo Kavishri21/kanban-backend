@@ -22,7 +22,7 @@ public class Task {
     private String title;
     private String description;
     private String status;       
-    private String tag;
+    private String reason;
     private String priority;     
 
     private Instant createdAt;

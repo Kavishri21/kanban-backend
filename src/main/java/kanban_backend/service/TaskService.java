@@ -58,7 +58,7 @@ public class TaskService {
 
         task.setTitle(updates.getTitle());
         task.setDescription(updates.getDescription());
-        task.setTag(updates.getTag());
+        task.setReason(updates.getReason());
         task.setPriority(updates.getPriority());
         task.setUpdatedAt(Instant.now());
 
