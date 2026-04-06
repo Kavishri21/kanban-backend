@@ -39,5 +39,6 @@ public class Task {
         private String status;
         private Instant changedAt;
         private String changedBy;
+        private String reason;
     }
 }

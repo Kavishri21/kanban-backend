@@ -37,7 +37,7 @@ public class TaskService {
         task.setStatus("todo"); 
         task.setUserId(user.getId()); 
 
-        task.getStatusHistory().add(new Task.StatusHistory("todo", now, user.getName()));
+        task.getStatusHistory().add(new Task.StatusHistory("todo", now, user.getName(), null));
 
         return taskRepository.save(task);
     }
@@ -52,7 +52,8 @@ public class TaskService {
         task.setStatus(newStatus);
         task.setUpdatedAt(now);
 
-        task.getStatusHistory().add(new Task.StatusHistory(newStatus, now, user.getName()));
+        String historyReason = "backlog".equals(newStatus) ? task.getReason() : null;
+        task.getStatusHistory().add(new Task.StatusHistory(newStatus, now, user.getName(), historyReason));
 
         return taskRepository.save(task);
     }
