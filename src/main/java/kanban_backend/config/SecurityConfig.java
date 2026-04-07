@@ -34,9 +34,12 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .cors(Customizer.withDefaults()) // Integrates with our existing CorsConfig
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll() // Login and signup are public
-                .requestMatchers("/error").permitAll() // ALWAYS allow spring to return the actual error!
-                .requestMatchers("/api/tasks/**").authenticated() // Tasks require token
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/error").permitAll()
+                .requestMatchers("/api/invitations/validate").permitAll()  // Public: recipient validates token
+                .requestMatchers("/api/invitations/accept").permitAll()    // Public: recipient sets password
+                .requestMatchers("/api/tasks/**").authenticated()
+                .requestMatchers("/api/invitations/**").authenticated()    // Send invite requires login
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session
