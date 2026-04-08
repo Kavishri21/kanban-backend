@@ -10,6 +10,6 @@ public interface InvitationRepository extends MongoRepository<Invitation, String
     // Find by the UUID token (used when recipient clicks the link)
     Optional<Invitation> findByToken(String token);
 
-    // Find any pending (unused) invite for this email (prevents duplicate invites)
-    Optional<Invitation> findByEmailAndUsedFalse(String email);
+    // Find all pending (unused) invites for this email
+    java.util.List<Invitation> findByEmailAndUsedFalse(String email);
 }

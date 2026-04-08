@@ -42,14 +42,14 @@ public class InvitationService {
             throw new RuntimeException("A user with this email is already a member.");
         }
 
-        // 2. Block if a valid (unused + not expired) invite already exists
-        invitationRepository.findByEmailAndUsedFalse(email).ifPresent(inv -> {
-            if (inv.getExpiresAt().isAfter(Instant.now())) {
-                throw new RuntimeException("An invitation has already been sent to this email.");
-            }
-        });
+        // 2. Inactivate previous unused invites for this email
+        java.util.List<Invitation> existingInvites = invitationRepository.findByEmailAndUsedFalse(email);
+        for (Invitation inv : existingInvites) {
+            inv.setUsed(true); // Effectively invalidates the old token
+        }
+        invitationRepository.saveAll(existingInvites);
 
-        // 3. Generate UUID token and save
+        // 3. Generate UUID token and save new invite
         String token = UUID.randomUUID().toString();
         Invitation invitation = new Invitation();
         invitation.setToken(token);
