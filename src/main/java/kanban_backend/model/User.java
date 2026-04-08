@@ -1,5 +1,6 @@
 package kanban_backend.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -17,5 +18,7 @@ public class User {
 
     private String name;
     private String email;
+
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) // Allow input (signup/login), hide output (JSON responses)
     private String password;
 }

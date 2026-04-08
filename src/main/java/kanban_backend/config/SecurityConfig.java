@@ -34,12 +34,12 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .cors(Customizer.withDefaults()) // Integrates with our existing CorsConfig
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/auth/login", "/api/auth/signup").permitAll()
+                .requestMatchers("/api/invitations/validate", "/api/invitations/accept").permitAll()
                 .requestMatchers("/error").permitAll()
-                .requestMatchers("/api/invitations/validate").permitAll()  // Public: recipient validates token
-                .requestMatchers("/api/invitations/accept").permitAll()    // Public: recipient sets password
                 .requestMatchers("/api/tasks/**").authenticated()
-                .requestMatchers("/api/invitations/**").authenticated()    // Send invite requires login
+                .requestMatchers("/api/users/**").authenticated()
+                .requestMatchers("/api/invitations/**").authenticated()
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session
