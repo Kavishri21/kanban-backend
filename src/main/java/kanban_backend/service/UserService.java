@@ -28,10 +28,9 @@ public class UserService {
     }
 
     public void deleteUser(String id) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        // 1. Safe Industry Practice: Unassign the tasks instead of deleting them
+        userRepository.findById(id).orElseThrow(() -> new RuntimeException("User not found"));
+        
+        // Unassign all tasks from this user before deleting them
         List<Task> userTasks = taskRepository.findByUserId(id);
         for (Task task : userTasks) {
             task.setUserId(null); // Mark as unassigned
