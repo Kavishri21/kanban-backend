@@ -45,7 +45,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
 
+                // Safe cast to our User model if necessary, or just check the active boolean
+                // Assuming CustomUserDetailsService returns the custom User details
                 if (jwtUtil.isTokenValid(jwt, userDetails.getUsername())) {
+                    
+                    // Force logout check: if user is not active, reject the request
+                    if (!userDetails.isEnabled()) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN, "Your account has been deactivated. Please contact your administrator.");
+                        return;
+                    }
+
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
                             null,

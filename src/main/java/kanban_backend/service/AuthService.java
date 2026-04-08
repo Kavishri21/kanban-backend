@@ -58,6 +58,10 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        if (!user.isActive()) {
+            throw new RuntimeException("Your account has been deactivated. Please contact your administrator.");
+        }
+
         String token = jwtUtil.generateToken(user.getEmail());
 
         Map<String, Object> response = new HashMap<>();

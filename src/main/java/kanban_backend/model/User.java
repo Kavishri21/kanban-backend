@@ -21,4 +21,12 @@ public class User {
 
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY) // Allow input (signup/login), hide output (JSON responses)
     private String password;
+
+    private Boolean active = true; // Use Boolean object to handle nulls from old data
+
+    public boolean isActive() {
+        return active == null || active;
+    }
 }
+
+
