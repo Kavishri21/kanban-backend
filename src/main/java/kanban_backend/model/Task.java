@@ -31,6 +31,8 @@ public class Task {
     private List<StatusHistory> statusHistory = new ArrayList<>();
 
     private String userId;
+    private String createdByUserId; // Who created/assigned this task
+
 
     @Data
     @NoArgsConstructor

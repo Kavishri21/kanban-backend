@@ -28,16 +28,24 @@ public class TaskService {
     }
 
     public Task createTask(Task task, String userEmail) {
-        kanban_backend.model.User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        // 1. Resolve the CREATOR (logged-in user)
+        kanban_backend.model.User creator = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("Creator not found"));
+        
+        // 2. Resolve the ASSIGNEE (from task.getUserId() sent from frontend)
+        // If frontend doesn't send a userId, default to creator (self-assign)
+        String assignedToId = (task.getUserId() != null && !task.getUserId().isBlank()) 
+                               ? task.getUserId() : creator.getId();
         
         Instant now = Instant.now();
         task.setCreatedAt(now);
         task.setUpdatedAt(now);
         task.setStatus("todo"); 
-        task.setUserId(user.getId()); 
+        task.setUserId(assignedToId); // Board where task will appear
+        task.setCreatedByUserId(creator.getId()); // Tracking who assigned it
 
-        task.getStatusHistory().add(new Task.StatusHistory("todo", now, user.getName(), null));
+        // 3. First history entry uses CREATOR's name
+        task.getStatusHistory().add(new Task.StatusHistory("todo", now, creator.getName(), null));
 
         return taskRepository.save(task);
     }
