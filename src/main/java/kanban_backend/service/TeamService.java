@@ -44,6 +44,22 @@ public class TeamService {
         return teamRepository.save(team);
     }
 
+    public void addMembersToTeam(String teamId, List<String> memberIds) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new RuntimeException("Team not found"));
+        
+        if (memberIds != null) {
+            for (String userId : memberIds) {
+                // Ensure exclusive membership
+                removeUserFromAnyTeam(userId);
+                if (!team.getMemberIds().contains(userId)) {
+                    team.getMemberIds().add(userId);
+                }
+            }
+        }
+        teamRepository.save(team);
+    }
+
     public void moveMember(String userId, String toTeamId) {
         // 1. Ensure exclusive membership: remove from current team
         removeUserFromAnyTeam(userId);

@@ -32,6 +32,15 @@ public class TeamController {
         return ResponseEntity.status(HttpStatus.CREATED).body(team);
     }
 
+    @PatchMapping("/{teamId}/members")
+    public ResponseEntity<Void> addMembers(
+            @PathVariable String teamId,
+            @RequestBody Map<String, List<String>> body) {
+        List<String> memberIds = body.get("memberIds");
+        teamService.addMembersToTeam(teamId, memberIds);
+        return ResponseEntity.ok().build();
+    }
+
     @PatchMapping("/members/{userId}/move")
     public ResponseEntity<Void> moveMember(
             @PathVariable String userId,
