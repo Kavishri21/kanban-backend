@@ -25,6 +25,7 @@ public class TeamController {
     }
 
     @PostMapping
+    @SuppressWarnings("unchecked")
     public ResponseEntity<Team> createTeam(@RequestBody Map<String, Object> body) {
         String name = (String) body.get("name");
         List<String> memberIds = (List<String>) body.get("memberIds");
