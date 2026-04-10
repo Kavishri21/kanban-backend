@@ -14,5 +14,6 @@ public class Team {
     @Id
     private String id;
     private String name;
+    private String createdByUserId;
     private List<String> memberIds = new ArrayList<>();
 }

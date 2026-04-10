@@ -27,16 +27,23 @@ public class TeamService {
         }
     }
 
-    public Team createTeam(String name, List<String> memberIds) {
+    public Team createTeam(String name, String createdByUserId, List<String> memberIds) {
         Team team = new Team();
         team.setName(name);
+        team.setCreatedByUserId(createdByUserId);
         
         List<String> finalMemberIds = new ArrayList<>();
         if (memberIds != null) {
             for (String userId : memberIds) {
-                // Ensure exclusive membership: remove from current team before adding to new one
-                removeUserFromAnyTeam(userId);
-                finalMemberIds.add(userId);
+                if (userId.equals(createdByUserId)) {
+                    // Creator is always added — never removed from other teams
+                    // (creators can span multiple teams)
+                    finalMemberIds.add(userId);
+                } else {
+                    // Regular members: enforce one-team rule by removing from previous team first
+                    removeUserFromAnyTeam(userId);
+                    finalMemberIds.add(userId);
+                }
             }
         }
         
@@ -50,7 +57,8 @@ public class TeamService {
         
         if (memberIds != null) {
             for (String userId : memberIds) {
-                // Ensure exclusive membership
+                if (userId.equals(team.getCreatedByUserId())) continue; // Skip creator: they can be in multiple teams
+                // Regular members: enforce one-team rule
                 removeUserFromAnyTeam(userId);
                 if (!team.getMemberIds().contains(userId)) {
                     team.getMemberIds().add(userId);
@@ -72,5 +80,25 @@ public class TeamService {
             targetTeam.getMemberIds().add(userId);
         }
         teamRepository.save(targetTeam);
+    }
+
+    public Team renameTeam(String teamId, String newName) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new RuntimeException("Team not found"));
+        team.setName(newName);
+        return teamRepository.save(team);
+    }
+
+    public void removeMemberFromTeam(String teamId, String userId) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new RuntimeException("Team not found"));
+        team.getMemberIds().remove(userId);
+        teamRepository.save(team);
+    }
+
+    public void deleteTeam(String teamId) {
+        teamRepository.findById(teamId)
+                .orElseThrow(() -> new RuntimeException("Team not found"));
+        teamRepository.deleteById(teamId);
     }
 }

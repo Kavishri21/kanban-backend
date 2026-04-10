@@ -28,8 +28,9 @@ public class TeamController {
     @SuppressWarnings("unchecked")
     public ResponseEntity<Team> createTeam(@RequestBody Map<String, Object> body) {
         String name = (String) body.get("name");
+        String createdByUserId = (String) body.get("createdByUserId");
         List<String> memberIds = (List<String>) body.get("memberIds");
-        Team team = teamService.createTeam(name, memberIds);
+        Team team = teamService.createTeam(name, createdByUserId, memberIds);
         return ResponseEntity.status(HttpStatus.CREATED).body(team);
     }
 
@@ -47,6 +48,28 @@ public class TeamController {
             @PathVariable String userId,
             @RequestParam String toTeamId) {
         teamService.moveMember(userId, toTeamId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PatchMapping("/{teamId}/name")
+    public ResponseEntity<Team> renameTeam(
+            @PathVariable String teamId,
+            @RequestBody Map<String, String> body) {
+        String newName = body.get("name");
+        return ResponseEntity.ok(teamService.renameTeam(teamId, newName));
+    }
+
+    @DeleteMapping("/{teamId}/members/{userId}")
+    public ResponseEntity<Void> removeMember(
+            @PathVariable String teamId,
+            @PathVariable String userId) {
+        teamService.removeMemberFromTeam(teamId, userId);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/{teamId}")
+    public ResponseEntity<Void> deleteTeam(@PathVariable String teamId) {
+        teamService.deleteTeam(teamId);
         return ResponseEntity.ok().build();
     }
 }
