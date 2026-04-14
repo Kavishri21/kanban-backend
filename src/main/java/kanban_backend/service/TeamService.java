@@ -6,7 +6,6 @@ import kanban_backend.repository.TeamRepository;
 import kanban_backend.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import java.util.List;
-import java.util.ArrayList;
 
 @Service
 public class TeamService {

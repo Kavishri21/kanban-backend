@@ -38,7 +38,6 @@ public class TaskService {
             } else {
                 // If no team specified, maybe finding tasks across all teams they are part of
                 // For safety, let's just return tasks they own or created
-                List<Task> tasksOwned = taskRepository.findByUserId(user.getId());
                 // Need to also combine tasks they created. MongoDB has no simple OR in MongoRepository without @Query unless we write one. Let's filter in memory if small, or just wait.
                 // It's better to expect teamId.
                 allTasks = taskRepository.findAll().stream()
@@ -76,17 +75,15 @@ public class TaskService {
         User creator = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Creator not found"));
         
-        if (task.getTeamId() == null || task.getTeamId().isBlank()) {
-            throw new RuntimeException("Tasks must belong to a team.");
-        }
-        
-        // Verify creator is in the team
-        boolean isOrgAdmin = "ORG_ADMIN".equals(creator.getGlobalRole());
-        if (!isOrgAdmin) {
-            Team team = teamRepository.findById(task.getTeamId()).orElseThrow(() -> new RuntimeException("Team not found"));
-            boolean isMember = team.getMembers().stream().anyMatch(m -> m.getUserId().equals(creator.getId()));
-            if (!isMember) {
-                 throw new RuntimeException("You cannot create tasks for a team you are not a member of.");
+        // Verify creator is in the team if a team is specified
+        if (task.getTeamId() != null && !task.getTeamId().isBlank()) {
+            boolean isOrgAdmin = "ORG_ADMIN".equals(creator.getGlobalRole());
+            if (!isOrgAdmin) {
+                Team team = teamRepository.findById(task.getTeamId()).orElseThrow(() -> new RuntimeException("Team not found"));
+                boolean isMember = team.getMembers().stream().anyMatch(m -> m.getUserId().equals(creator.getId()));
+                if (!isMember) {
+                     throw new RuntimeException("You cannot create tasks for a team you are not a member of.");
+                }
             }
         }
 
