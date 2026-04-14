@@ -1,7 +1,9 @@
 package kanban_backend.service;
 
 import kanban_backend.model.Team;
+import kanban_backend.model.User;
 import kanban_backend.repository.TeamRepository;
+import kanban_backend.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.ArrayList;
@@ -10,95 +12,148 @@ import java.util.ArrayList;
 public class TeamService {
 
     private final TeamRepository teamRepository;
+    private final UserRepository userRepository;
 
-    public TeamService(TeamRepository teamRepository) {
+    public TeamService(TeamRepository teamRepository, UserRepository userRepository) {
         this.teamRepository = teamRepository;
+        this.userRepository = userRepository;
     }
 
-    public List<Team> getAllTeams() {
-        return teamRepository.findAll();
-    }
-
-    private void removeUserFromAnyTeam(String userId) {
-        List<Team> currentTeams = teamRepository.findByMemberIdsContaining(userId);
-        for (Team t : currentTeams) {
-            t.getMemberIds().remove(userId);
-            teamRepository.save(t);
+    public List<Team> getAllTeams(String requesterEmail) {
+        if (requesterEmail == null) {
+             return teamRepository.findAll();
         }
+        User requester = userRepository.findByEmail(requesterEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        if ("ORG_ADMIN".equals(requester.getGlobalRole())) {
+            return teamRepository.findAll();
+        }
+        
+        // MANAGER and EMPLOYEE only see teams where they are members
+        return teamRepository.findByMembersUserId(requester.getId());
     }
 
-    public Team createTeam(String name, String createdByUserId, List<String> memberIds) {
+    public Team createTeam(String name, String creatorEmail) {
+        User creator = userRepository.findByEmail(creatorEmail)
+                .orElseThrow(() -> new RuntimeException("Creator not found"));
+        
+        if ("EMPLOYEE".equals(creator.getGlobalRole())) {
+            throw new RuntimeException("Employees cannot create teams.");
+        }
+
         Team team = new Team();
         team.setName(name);
-        team.setCreatedByUserId(createdByUserId);
+        team.setCreatedByUserId(creator.getId()); // Retain as origin log tracking
         
-        List<String> finalMemberIds = new ArrayList<>();
-        if (memberIds != null) {
-            for (String userId : memberIds) {
-                if (userId.equals(createdByUserId)) {
-                    // Creator is always added — never removed from other teams
-                    // (creators can span multiple teams)
-                    finalMemberIds.add(userId);
-                } else {
-                    // Regular members: enforce one-team rule by removing from previous team first
-                    removeUserFromAnyTeam(userId);
-                    finalMemberIds.add(userId);
-                }
-            }
-        }
+        // Add creator as LEAD
+        team.getMembers().add(new Team.TeamMember(creator.getId(), "LEAD"));
         
-        team.setMemberIds(finalMemberIds);
         return teamRepository.save(team);
     }
 
-    public void addMembersToTeam(String teamId, List<String> memberIds) {
-        Team team = teamRepository.findById(teamId)
-                .orElseThrow(() -> new RuntimeException("Team not found"));
+    public Team addMemberToTeam(String teamId, String targetUserId, String teamRole, String requesterEmail) {
+        Team team = teamRepository.findById(teamId).orElseThrow(() -> new RuntimeException("Team not found"));
+        User requester = userRepository.findByEmail(requesterEmail).orElseThrow(() -> new RuntimeException("User not found"));
         
-        if (memberIds != null) {
-            for (String userId : memberIds) {
-                if (userId.equals(team.getCreatedByUserId())) continue; // Skip creator: they can be in multiple teams
-                // Regular members: enforce one-team rule
-                removeUserFromAnyTeam(userId);
-                if (!team.getMemberIds().contains(userId)) {
-                    team.getMemberIds().add(userId);
+        boolean isOrgAdmin = "ORG_ADMIN".equals(requester.getGlobalRole());
+        boolean isLead = team.getMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "LEAD".equals(m.getTeamRole()));
+                
+        if (!isOrgAdmin && !isLead) {
+            throw new RuntimeException("Only Team Leads or Org Admins can add members.");
+        }
+        
+        if (team.getMembers().stream().anyMatch(m -> m.getUserId().equals(targetUserId))) {
+            throw new RuntimeException("User is already in the team.");
+        }
+
+        team.getMembers().add(new Team.TeamMember(targetUserId, teamRole));
+        return teamRepository.save(team);
+    }
+    
+    public Team updateMemberRole(String teamId, String targetUserId, String newTeamRole, String requesterEmail) {
+        Team team = teamRepository.findById(teamId).orElseThrow(() -> new RuntimeException("Team not found"));
+        User requester = userRepository.findByEmail(requesterEmail).orElseThrow(() -> new RuntimeException("User not found"));
+        
+        boolean isOrgAdmin = "ORG_ADMIN".equals(requester.getGlobalRole());
+        boolean isLead = team.getMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "LEAD".equals(m.getTeamRole()));
+                
+        if (!isOrgAdmin && !isLead) {
+            throw new RuntimeException("Only Team Leads or Org Admins can update roles.");
+        }
+
+        // Rule 4: Last LEAD protection
+        if ("CONTRIBUTOR".equals(newTeamRole)) {
+            Team.TeamMember targetMember = team.getMembers().stream()
+                .filter(m -> m.getUserId().equals(targetUserId))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Member not found in team"));
+                
+            if ("LEAD".equals(targetMember.getTeamRole())) {
+                long leadCount = team.getMembers().stream().filter(m -> "LEAD".equals(m.getTeamRole())).count();
+                if (leadCount <= 1) {
+                    throw new RuntimeException("Cannot remove the only team lead. Promote another member to Lead first.");
                 }
             }
         }
-        teamRepository.save(team);
+
+        team.getMembers().forEach(m -> {
+            if (m.getUserId().equals(targetUserId)) {
+                m.setTeamRole(newTeamRole);
+            }
+        });
+
+        return teamRepository.save(team);
     }
 
-    public void moveMember(String userId, String toTeamId) {
-        // 1. Ensure exclusive membership: remove from current team
-        removeUserFromAnyTeam(userId);
-
-        // 2. Add user to the new target team
-        Team targetTeam = teamRepository.findById(toTeamId)
-                .orElseThrow(() -> new RuntimeException("Target team not found"));
+    public Team renameTeam(String teamId, String newName, String requesterEmail) {
+        Team team = teamRepository.findById(teamId).orElseThrow(() -> new RuntimeException("Team not found"));
+        User requester = userRepository.findByEmail(requesterEmail).orElseThrow(() -> new RuntimeException("User not found"));
         
-        if (!targetTeam.getMemberIds().contains(userId)) {
-            targetTeam.getMemberIds().add(userId);
+        boolean isOrgAdmin = "ORG_ADMIN".equals(requester.getGlobalRole());
+        boolean isLead = team.getMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "LEAD".equals(m.getTeamRole()));
+                
+        if (!isOrgAdmin && !isLead) {
+            throw new RuntimeException("Only Team Leads or Org Admins can rename the team.");
         }
-        teamRepository.save(targetTeam);
-    }
 
-    public Team renameTeam(String teamId, String newName) {
-        Team team = teamRepository.findById(teamId)
-                .orElseThrow(() -> new RuntimeException("Team not found"));
         team.setName(newName);
         return teamRepository.save(team);
     }
 
-    public void removeMemberFromTeam(String teamId, String userId) {
-        Team team = teamRepository.findById(teamId)
-                .orElseThrow(() -> new RuntimeException("Team not found"));
-        team.getMemberIds().remove(userId);
+    public void removeMemberFromTeam(String teamId, String targetUserId, String requesterEmail) {
+        Team team = teamRepository.findById(teamId).orElseThrow(() -> new RuntimeException("Team not found"));
+        User requester = userRepository.findByEmail(requesterEmail).orElseThrow(() -> new RuntimeException("User not found"));
+        
+        boolean isOrgAdmin = "ORG_ADMIN".equals(requester.getGlobalRole());
+        boolean isLead = team.getMembers().stream()
+                .anyMatch(m -> m.getUserId().equals(requester.getId()) && "LEAD".equals(m.getTeamRole()));
+                
+        if (!isOrgAdmin && !isLead) {
+            throw new RuntimeException("Only Team Leads or Org Admins can remove members.");
+        }
+
+        Team.TeamMember targetMember = team.getMembers().stream()
+            .filter(m -> m.getUserId().equals(targetUserId))
+            .findFirst()
+            .orElseThrow(() -> new RuntimeException("Member not found in team"));
+
+        if ("LEAD".equals(targetMember.getTeamRole())) {
+            long leadCount = team.getMembers().stream().filter(m -> "LEAD".equals(m.getTeamRole())).count();
+            if (leadCount <= 1) {
+                throw new RuntimeException("Cannot remove the only team lead. Promote another member to Lead first.");
+            }
+        }
+
+        team.getMembers().removeIf(m -> m.getUserId().equals(targetUserId));
         teamRepository.save(team);
     }
 
     public void deleteTeam(String teamId) {
-        teamRepository.findById(teamId)
-                .orElseThrow(() -> new RuntimeException("Team not found"));
+        teamRepository.findById(teamId).orElseThrow(() -> new RuntimeException("Team not found"));
         teamRepository.deleteById(teamId);
     }
 }

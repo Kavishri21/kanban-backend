@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 
@@ -20,55 +21,61 @@ public class TeamController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Team>> getAllTeams() {
-        return ResponseEntity.ok(teamService.getAllTeams());
+    public ResponseEntity<List<Team>> getAllTeams(Principal principal) {
+        return ResponseEntity.ok(teamService.getAllTeams(principal.getName()));
     }
 
     @PostMapping
-    @SuppressWarnings("unchecked")
-    public ResponseEntity<Team> createTeam(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<Team> createTeam(@RequestBody Map<String, Object> body, Principal principal) {
         String name = (String) body.get("name");
-        String createdByUserId = (String) body.get("createdByUserId");
-        List<String> memberIds = (List<String>) body.get("memberIds");
-        Team team = teamService.createTeam(name, createdByUserId, memberIds);
+        Team team = teamService.createTeam(name, principal.getName());
         return ResponseEntity.status(HttpStatus.CREATED).body(team);
     }
 
-    @PatchMapping("/{teamId}/members")
-    public ResponseEntity<Void> addMembers(
+    @PostMapping("/{teamId}/members")
+    public ResponseEntity<Team> addMember(
             @PathVariable String teamId,
-            @RequestBody Map<String, List<String>> body) {
-        List<String> memberIds = body.get("memberIds");
-        teamService.addMembersToTeam(teamId, memberIds);
-        return ResponseEntity.ok().build();
+            @RequestBody Map<String, String> body,
+            Principal principal) {
+        String targetUserId = body.get("userId");
+        String teamRole = body.get("teamRole"); // "LEAD" or "CONTRIBUTOR"
+        Team updated = teamService.addMemberToTeam(teamId, targetUserId, teamRole, principal.getName());
+        return ResponseEntity.ok(updated);
     }
-
-    @PatchMapping("/members/{userId}/move")
-    public ResponseEntity<Void> moveMember(
+    
+    @PatchMapping("/{teamId}/members/{userId}/role")
+    public ResponseEntity<Team> updateMemberRole(
+            @PathVariable String teamId,
             @PathVariable String userId,
-            @RequestParam String toTeamId) {
-        teamService.moveMember(userId, toTeamId);
-        return ResponseEntity.ok().build();
+            @RequestBody Map<String, String> body,
+            Principal principal) {
+        String newTeamRole = body.get("teamRole");
+        Team updated = teamService.updateMemberRole(teamId, userId, newTeamRole, principal.getName());
+        return ResponseEntity.ok(updated);
     }
 
     @PatchMapping("/{teamId}/name")
     public ResponseEntity<Team> renameTeam(
             @PathVariable String teamId,
-            @RequestBody Map<String, String> body) {
+            @RequestBody Map<String, String> body,
+            Principal principal) {
         String newName = body.get("name");
-        return ResponseEntity.ok(teamService.renameTeam(teamId, newName));
+        return ResponseEntity.ok(teamService.renameTeam(teamId, newName, principal.getName()));
     }
 
     @DeleteMapping("/{teamId}/members/{userId}")
     public ResponseEntity<Void> removeMember(
             @PathVariable String teamId,
-            @PathVariable String userId) {
-        teamService.removeMemberFromTeam(teamId, userId);
+            @PathVariable String userId,
+            Principal principal) {
+        teamService.removeMemberFromTeam(teamId, userId, principal.getName());
         return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/{teamId}")
     public ResponseEntity<Void> deleteTeam(@PathVariable String teamId) {
+        // usually admin level only, but we didn't add requesterEmail to deleteTeam yet. 
+        // We'll leave it as is or add it:
         teamService.deleteTeam(teamId);
         return ResponseEntity.ok().build();
     }

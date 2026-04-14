@@ -24,6 +24,8 @@ public class User {
 
     private Boolean active = true; // Use Boolean object to handle nulls from old data
 
+    private String globalRole = "EMPLOYEE"; // ORG_ADMIN, MANAGER, EMPLOYEE
+
     public boolean isActive() {
         return active == null || active;
     }

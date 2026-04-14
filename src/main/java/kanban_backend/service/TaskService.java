@@ -1,39 +1,95 @@
 package kanban_backend.service;
 
 import kanban_backend.model.Task;
+import kanban_backend.model.User;
 import kanban_backend.repository.TaskRepository;
+import kanban_backend.repository.UserRepository;
+import kanban_backend.repository.TeamRepository;
+import kanban_backend.model.Team;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class TaskService {
 
     private final TaskRepository taskRepository;
-    private final kanban_backend.repository.UserRepository userRepository;
+    private final UserRepository userRepository;
+    private final TeamRepository teamRepository;
 
-    public TaskService(TaskRepository taskRepository, kanban_backend.repository.UserRepository userRepository) {
+    public TaskService(TaskRepository taskRepository, UserRepository userRepository, TeamRepository teamRepository) {
         this.taskRepository = taskRepository;
         this.userRepository = userRepository;
+        this.teamRepository = teamRepository;
     }
 
-    private String getUserId(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found")).getId();
-    }
-
-    public List<Task> getAllTasks(String userEmail) {
-        return taskRepository.findByUserId(getUserId(userEmail));
+    public List<Task> getTasks(String userEmail, String teamId) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+                
+        boolean isOrgAdmin = "ORG_ADMIN".equals(user.getGlobalRole());
+        
+        List<Task> allTasks;
+        if (teamId == null || teamId.isBlank()) {
+            if (isOrgAdmin) {
+                allTasks = taskRepository.findAll();
+            } else {
+                // If no team specified, maybe finding tasks across all teams they are part of
+                // For safety, let's just return tasks they own or created
+                List<Task> tasksOwned = taskRepository.findByUserId(user.getId());
+                // Need to also combine tasks they created. MongoDB has no simple OR in MongoRepository without @Query unless we write one. Let's filter in memory if small, or just wait.
+                // It's better to expect teamId.
+                allTasks = taskRepository.findAll().stream()
+                    .filter(t -> user.getId().equals(t.getUserId()) || user.getId().equals(t.getCreatedByUserId()))
+                    .collect(Collectors.toList());
+            }
+        } else {
+            // Verify team membership
+            if (!isOrgAdmin) {
+                Team team = teamRepository.findById(teamId).orElseThrow(() -> new RuntimeException("Team not found"));
+                boolean isMember = team.getMembers().stream().anyMatch(m -> m.getUserId().equals(user.getId()));
+                if (!isMember) {
+                    throw new RuntimeException("You do not have access to this team's tasks");
+                }
+            }
+            
+            List<Task> teamTasks = taskRepository.findAll().stream()
+                .filter(t -> teamId.equals(t.getTeamId()))
+                .collect(Collectors.toList());
+                
+            if (isOrgAdmin) {
+                allTasks = teamTasks;
+            } else {
+                // The explicit user requirement: "should see only tasks that are creataed by him or assigned to him from higher level members and not the entire team tasks"
+                allTasks = teamTasks.stream()
+                    .filter(t -> user.getId().equals(t.getUserId()) || user.getId().equals(t.getCreatedByUserId()))
+                    .collect(Collectors.toList());
+            }
+        }
+        
+        return allTasks;
     }
 
     public Task createTask(Task task, String userEmail) {
-        // 1. Resolve the CREATOR (logged-in user)
-        kanban_backend.model.User creator = userRepository.findByEmail(userEmail)
+        User creator = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Creator not found"));
         
-        // 2. Resolve the ASSIGNEE (from task.getUserId() sent from frontend)
-        // If frontend doesn't send a userId, default to creator (self-assign)
+        if (task.getTeamId() == null || task.getTeamId().isBlank()) {
+            throw new RuntimeException("Tasks must belong to a team.");
+        }
+        
+        // Verify creator is in the team
+        boolean isOrgAdmin = "ORG_ADMIN".equals(creator.getGlobalRole());
+        if (!isOrgAdmin) {
+            Team team = teamRepository.findById(task.getTeamId()).orElseThrow(() -> new RuntimeException("Team not found"));
+            boolean isMember = team.getMembers().stream().anyMatch(m -> m.getUserId().equals(creator.getId()));
+            if (!isMember) {
+                 throw new RuntimeException("You cannot create tasks for a team you are not a member of.");
+            }
+        }
+
         String assignedToId = (task.getUserId() != null && !task.getUserId().isBlank()) 
                                ? task.getUserId() : creator.getId();
         
@@ -41,10 +97,9 @@ public class TaskService {
         task.setCreatedAt(now);
         task.setUpdatedAt(now);
         task.setStatus("todo"); 
-        task.setUserId(assignedToId); // Board where task will appear
-        task.setCreatedByUserId(creator.getId()); // Tracking who assigned it
+        task.setUserId(assignedToId); 
+        task.setCreatedByUserId(creator.getId());
 
-        // 3. First history entry uses CREATOR's name
         task.getStatusHistory().add(new Task.StatusHistory("todo", now, creator.getName(), null));
 
         return taskRepository.save(task);
@@ -53,8 +108,16 @@ public class TaskService {
     public Task updateStatus(String id, String newStatus, String userEmail) {
         Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Task not found: " + id));
-        kanban_backend.model.User user = userRepository.findByEmail(userEmail)
+        User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!"ORG_ADMIN".equals(user.getGlobalRole())) {
+             Team team = teamRepository.findById(task.getTeamId()).orElseThrow(() -> new RuntimeException("Team not found"));
+             boolean isMember = team.getMembers().stream().anyMatch(m -> m.getUserId().equals(user.getId()));
+             if (!isMember) {
+                 throw new RuntimeException("Access denied.");
+             }
+        }
 
         Instant now = Instant.now();
         task.setStatus(newStatus);
