@@ -30,7 +30,8 @@ public class Task {
 
     private List<StatusHistory> statusHistory = new ArrayList<>();
 
-    private String userId;
+    private String teamId;          // The team this task belongs to
+    private String userId;          // The assigned user
     private String createdByUserId; // Who created/assigned this task
 
 

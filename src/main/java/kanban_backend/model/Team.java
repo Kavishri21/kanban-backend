@@ -1,5 +1,6 @@
 package kanban_backend.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
@@ -14,5 +15,14 @@ public class Team {
     @Id
     private String id;
     private String name;
-    private List<String> memberIds = new ArrayList<>();
+    private String createdByUserId;
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TeamMember {
+        private String userId;
+        private String teamRole; // "LEAD" | "CONTRIBUTOR"
+    }
+
+    private List<TeamMember> members = new ArrayList<>();
 }

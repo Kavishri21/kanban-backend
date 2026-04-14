@@ -21,8 +21,10 @@ public class TaskController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Task>> getAllTasks(Principal principal) {
-        return ResponseEntity.ok(taskService.getAllTasks(principal.getName()));
+    public ResponseEntity<List<Task>> getAllTasks(
+            @RequestParam(required = false) String teamId,
+            Principal principal) {
+        return ResponseEntity.ok(taskService.getTasks(principal.getName(), teamId));
     }
 
     @PostMapping
