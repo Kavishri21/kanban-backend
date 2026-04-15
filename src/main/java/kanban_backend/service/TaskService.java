@@ -18,11 +18,14 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
     private final TeamRepository teamRepository;
+    private final EmailService emailService;
 
-    public TaskService(TaskRepository taskRepository, UserRepository userRepository, TeamRepository teamRepository) {
+    public TaskService(TaskRepository taskRepository, UserRepository userRepository,
+                       TeamRepository teamRepository, EmailService emailService) {
         this.taskRepository = taskRepository;
         this.userRepository = userRepository;
         this.teamRepository = teamRepository;
+        this.emailService = emailService;
     }
 
     public List<Task> getTasks(String userEmail, String teamId, boolean createdByMe) {
@@ -117,7 +120,38 @@ public class TaskService {
 
         task.getStatusHistory().add(new Task.StatusHistory("todo", now, creator.getName(), null));
 
-        return taskRepository.save(task);
+        Task savedTask = taskRepository.save(task);
+
+        // ── Email Notification ─────────────────────────────────────────────
+        // Only notify if assigner != assignee (skip self-assignments like "Myself")
+        if (!creator.getId().equals(assignedToId)) {
+            try {
+                User assignee = userRepository.findById(assignedToId)
+                    .orElseThrow(() -> new RuntimeException("Assignee not found"));
+
+                String teamName = "Personal Task";
+                if (task.getTeamId() != null && !task.getTeamId().isBlank()) {
+                    teamName = teamRepository.findById(task.getTeamId())
+                        .map(t -> t.getName())
+                        .orElse("Unknown Team");
+                }
+
+                emailService.sendTaskAssignmentEmail(
+                    assignee.getEmail(),
+                    assignee.getName(),
+                    creator.getName(),
+                    task.getTitle(),
+                    task.getPriority() != null ? task.getPriority() : "medium",
+                    teamName
+                );
+            } catch (Exception e) {
+                // Email is optional — task is already saved, just log the error
+                System.err.println("Could not send task assignment email: " + e.getMessage());
+            }
+        }
+        // ────────────────────────────────────────────────────────────────────
+
+        return savedTask;
     }
 
     public Task updateStatus(String id, String newStatus, String userEmail) {
