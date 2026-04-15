@@ -25,7 +25,7 @@ public class TaskService {
         this.teamRepository = teamRepository;
     }
 
-    public List<Task> getTasks(String userEmail, String teamId) {
+    public List<Task> getTasks(String userEmail, String teamId, boolean createdByMe) {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found"));
                 
@@ -34,14 +34,23 @@ public class TaskService {
         List<Task> allTasks;
         if (teamId == null || teamId.isBlank()) {
             if (isOrgAdmin) {
-                allTasks = taskRepository.findAll();
+                if (createdByMe) {
+                    allTasks = taskRepository.findAll().stream()
+                        .filter(t -> user.getId().equals(t.getCreatedByUserId()))
+                        .collect(Collectors.toList());
+                } else {
+                    allTasks = taskRepository.findAll();
+                }
             } else {
                 // If no team specified, maybe finding tasks across all teams they are part of
                 // For safety, let's just return tasks they own or created
                 // Need to also combine tasks they created. MongoDB has no simple OR in MongoRepository without @Query unless we write one. Let's filter in memory if small, or just wait.
                 // It's better to expect teamId.
                 allTasks = taskRepository.findAll().stream()
-                    .filter(t -> user.getId().equals(t.getUserId()) || user.getId().equals(t.getCreatedByUserId()))
+                    .filter(t -> {
+                        if (createdByMe) return user.getId().equals(t.getCreatedByUserId());
+                        return user.getId().equals(t.getUserId()) || user.getId().equals(t.getCreatedByUserId());
+                    })
                     .collect(Collectors.toList());
             }
         } else {
@@ -59,11 +68,20 @@ public class TaskService {
                 .collect(Collectors.toList());
                 
             if (isOrgAdmin) {
-                allTasks = teamTasks;
+                if (createdByMe) {
+                    allTasks = teamTasks.stream()
+                        .filter(t -> user.getId().equals(t.getCreatedByUserId()))
+                        .collect(Collectors.toList());
+                } else {
+                    allTasks = teamTasks;
+                }
             } else {
                 // The explicit user requirement: "should see only tasks that are creataed by him or assigned to him from higher level members and not the entire team tasks"
                 allTasks = teamTasks.stream()
-                    .filter(t -> user.getId().equals(t.getUserId()) || user.getId().equals(t.getCreatedByUserId()))
+                    .filter(t -> {
+                        if (createdByMe) return user.getId().equals(t.getCreatedByUserId());
+                        return user.getId().equals(t.getUserId()) || user.getId().equals(t.getCreatedByUserId());
+                    })
                     .collect(Collectors.toList());
             }
         }
