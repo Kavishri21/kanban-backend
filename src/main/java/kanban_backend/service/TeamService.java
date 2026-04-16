@@ -12,10 +12,12 @@ public class TeamService {
 
     private final TeamRepository teamRepository;
     private final UserRepository userRepository;
+    private final EmailService emailService;
 
-    public TeamService(TeamRepository teamRepository, UserRepository userRepository) {
+    public TeamService(TeamRepository teamRepository, UserRepository userRepository, EmailService emailService) {
         this.teamRepository = teamRepository;
         this.userRepository = userRepository;
+        this.emailService = emailService;
     }
 
     public List<Team> getAllTeams(String requesterEmail) {
@@ -68,7 +70,27 @@ public class TeamService {
         }
 
         team.getMembers().add(new Team.TeamMember(targetUserId, teamRole));
-        return teamRepository.save(team);
+        Team saved = teamRepository.save(team);
+
+        // Send Notification Email
+        try {
+            if (!targetUserId.equals(requester.getId())) {
+                User targetUser = userRepository.findById(targetUserId)
+                        .orElseThrow(() -> new RuntimeException("Target user not found"));
+                
+                emailService.sendTeamAdditionEmail(
+                    targetUser.getEmail(),
+                    targetUser.getName(),
+                    requester.getName(),
+                    team.getName()
+                );
+            }
+        } catch (Exception e) {
+            // Email is secondary — don't block the member addition
+            System.err.println("Could not send team addition email: " + e.getMessage());
+        }
+
+        return saved;
     }
     
     public Team updateMemberRole(String teamId, String targetUserId, String newTeamRole, String requesterEmail) {

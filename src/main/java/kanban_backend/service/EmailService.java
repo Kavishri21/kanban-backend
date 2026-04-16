@@ -122,5 +122,50 @@ public class EmailService {
             System.err.println("Failed to send task assignment email: " + e.getMessage());
         }
     }
+    public void sendTeamAdditionEmail(String toEmail, String toName, String requesterName, String teamName) {
+        String boardUrl = frontendUrl;
+
+        String htmlContent = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; background: #f8fafc; border-radius: 12px;'>"
+            + "<div style='background: white; border-radius: 10px; padding: 32px; border: 1px solid #e2e8f0;'>"
+            + "<h2 style='color: #1d4ed8; margin-bottom: 4px; font-size: 20px;'>🚀 You've been added to a Team</h2>"
+            + "<p style='color: #64748b; margin-top: 0; font-size: 14px;'>Kanban Board Notification</p>"
+            + "<hr style='border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;'/>"
+            + "<p style='color: #374151; font-size: 15px;'>Hi <strong>" + toName + "</strong>,</p>"
+            + "<p style='color: #374151; font-size: 15px;'>You have been added to the team <strong>" + teamName + "</strong> by <strong>" + requesterName + "</strong>.</p>"
+            + "<div style='background: #f1f5f9; border-left: 4px solid #2563eb; border-radius: 6px; padding: 16px 20px; margin: 20px 0; text-align: center;'>"
+            + "<p style='margin: 0; font-size: 16px; color: #1e293b;'>You can now access tasks and collaborate within <strong>" + teamName + "</strong>.</p>"
+            + "</div>"
+            + "<a href='" + boardUrl + "' style='display: inline-block; background: #2563eb; color: white; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 15px; margin-top: 8px;'>Go to Dashboard →</a>"
+            + "<p style='color: #9ca3af; font-size: 13px; margin-top: 28px;'>Manage your tasks and teams efficiently on your Kanban Board.</p>"
+            + "</div></div>";
+
+        try {
+            Map<String, Object> body = Map.of(
+                "sender", Map.of("name", "Kanban Board", "email", "dr.kavi21k@gmail.com"),
+                "to", List.of(Map.of("email", toEmail, "name", toName)),
+                "subject", "You've been added to a new team: " + teamName,
+                "htmlContent", htmlContent
+            );
+
+            String requestBody = objectMapper.writeValueAsString(body);
+
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://api.brevo.com/v3/smtp/email"))
+                .header("Content-Type", "application/json")
+                .header("api-key", brevoApiKey)
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 201) {
+                System.err.println("Team addition email failed (Brevo): " + response.body());
+            }
+
+        } catch (Exception e) {
+            System.err.println("Failed to send team addition email: " + e.getMessage());
+        }
+    }
 }
 
