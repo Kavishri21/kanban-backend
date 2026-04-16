@@ -161,11 +161,23 @@ public class TaskService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         if (!"ORG_ADMIN".equals(user.getGlobalRole())) {
-             Team team = teamRepository.findById(task.getTeamId()).orElseThrow(() -> new RuntimeException("Team not found"));
-             boolean isMember = team.getMembers().stream().anyMatch(m -> m.getUserId().equals(user.getId()));
-             if (!isMember) {
-                 throw new RuntimeException("Access denied.");
-             }
+            if (task.getTeamId() != null && !task.getTeamId().isBlank()) {
+                // Team task — verify user is a member of that team
+                Team team = teamRepository.findById(task.getTeamId())
+                        .orElseThrow(() -> new RuntimeException("Team not found"));
+                boolean isMember = team.getMembers().stream()
+                        .anyMatch(m -> m.getUserId().equals(user.getId()));
+                if (!isMember) {
+                    throw new RuntimeException("Access denied: not a team member.");
+                }
+            } else {
+                // Personal task (no teamId) — only the owner or creator can move it
+                boolean isOwnerOrCreator = user.getId().equals(task.getUserId())
+                        || user.getId().equals(task.getCreatedByUserId());
+                if (!isOwnerOrCreator) {
+                    throw new RuntimeException("Access denied: not the task owner.");
+                }
+            }
         }
 
         Instant now = Instant.now();
