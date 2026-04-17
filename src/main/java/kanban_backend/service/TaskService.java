@@ -198,6 +198,7 @@ public class TaskService {
         task.setDescription(updates.getDescription());
         task.setReason(updates.getReason());
         task.setPriority(updates.getPriority());
+        task.setDueDate(updates.getDueDate());
         task.setUpdatedAt(Instant.now());
 
         return taskRepository.save(task);
