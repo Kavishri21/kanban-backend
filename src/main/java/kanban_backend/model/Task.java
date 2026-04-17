@@ -24,6 +24,7 @@ public class Task {
     private String status;       
     private String reason;
     private String priority;     
+    private Instant dueDate;
 
     private Instant createdAt;
     private Instant updatedAt;   
