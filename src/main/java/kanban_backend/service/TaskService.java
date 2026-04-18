@@ -2,9 +2,11 @@ package kanban_backend.service;
 
 import kanban_backend.model.Task;
 import kanban_backend.model.User;
+import kanban_backend.model.Counter;
 import kanban_backend.repository.TaskRepository;
 import kanban_backend.repository.UserRepository;
 import kanban_backend.repository.TeamRepository;
+import kanban_backend.repository.CounterRepository;
 import kanban_backend.model.Team;
 import org.springframework.stereotype.Service;
 
@@ -19,13 +21,46 @@ public class TaskService {
     private final UserRepository userRepository;
     private final TeamRepository teamRepository;
     private final EmailService emailService;
+    private final CounterRepository counterRepository;
 
     public TaskService(TaskRepository taskRepository, UserRepository userRepository,
-                       TeamRepository teamRepository, EmailService emailService) {
+                       TeamRepository teamRepository, EmailService emailService,
+                       CounterRepository counterRepository) {
         this.taskRepository = taskRepository;
         this.userRepository = userRepository;
         this.teamRepository = teamRepository;
         this.emailService = emailService;
+        this.counterRepository = counterRepository;
+    }
+
+    /**
+     * Generates a prefix code from a team name:
+     *   - 2+ words: 1st letter of word 1 + first 2 letters of word 2 (uppercase)
+     *   - 1 word:   first 3 letters (uppercase)
+     */
+    private String buildTeamPrefix(String teamName) {
+        if (teamName == null || teamName.isBlank()) return "MY";
+        String[] words = teamName.trim().toUpperCase().split("\\s+");
+        if (words.length == 1) {
+            String w = words[0].replaceAll("[^A-Z]", "");
+            return w.length() >= 3 ? w.substring(0, 3) : w;
+        }
+        String w1 = words[0].replaceAll("[^A-Z]", "");
+        String w2 = words[1].replaceAll("[^A-Z]", "");
+        String p1 = w1.isEmpty() ? "" : w1.substring(0, 1);
+        String p2 = w2.length() >= 2 ? w2.substring(0, 2) : w2;
+        return p1 + p2;
+    }
+
+    /**
+     * Atomically increment and return the next sequence number for a given prefix.
+     */
+    private synchronized long getNextSequence(String prefix) {
+        Counter counter = counterRepository.findById(prefix)
+                .orElse(new Counter(prefix, 0L));
+        counter.setSeq(counter.getSeq() + 1);
+        counterRepository.save(counter);
+        return counter.getSeq();
     }
 
     public List<Task> getTasks(String userEmail, String teamId, boolean createdByMe) {
@@ -119,6 +154,18 @@ public class TaskService {
         task.setCreatedByUserId(creator.getId());
 
         task.getStatusHistory().add(new Task.StatusHistory("todo", now, creator.getName(), null));
+
+        // ── Generate Human-Readable Task ID ─────────────────────────────────
+        String prefix;
+        if (task.getTeamId() != null && !task.getTeamId().isBlank()) {
+            Team teamForId = teamRepository.findById(task.getTeamId()).orElse(null);
+            prefix = (teamForId != null) ? buildTeamPrefix(teamForId.getName()) : "MY";
+        } else {
+            prefix = "MY";
+        }
+        long seq = getNextSequence(prefix);
+        task.setTaskID(prefix + seq);
+        // ────────────────────────────────────────────────────────────────────
 
         Task savedTask = taskRepository.save(task);
 

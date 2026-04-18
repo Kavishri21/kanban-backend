@@ -19,6 +19,8 @@ public class Task {
     @Id
     private String id;
 
+    private String taskID;       // Human-readable ID e.g., "MY1", "TFR2"
+
     private String title;
     private String description;
     private String status;       
