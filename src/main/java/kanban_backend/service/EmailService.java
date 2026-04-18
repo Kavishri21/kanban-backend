@@ -23,7 +23,7 @@ public class EmailService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public void sendInviteEmail(String toEmail, String toName, String inviterName, String token) {
-        String inviteLink = frontendUrl + "/invite/accept?token=" + token;
+        String inviteLink = frontendUrl + "/accept-invite?token=" + token;
 
         String htmlContent = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px;'>"
             + "<h2 style='color: #1d4ed8; margin-bottom: 8px;'>You're invited to join Kanban Board!</h2>"
