@@ -32,6 +32,7 @@ public class Task {
     private Instant updatedAt;   
 
     private List<StatusHistory> statusHistory = new ArrayList<>();
+    private List<Comment> comments = new ArrayList<>();
 
     private String teamId;          // The team this task belongs to
     private String userId;          // The assigned user
@@ -46,5 +47,18 @@ public class Task {
         private Instant changedAt;
         private String changedBy;
         private String reason;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Comment {
+        private String id;
+        private String authorId;
+        private String authorName;
+        private String text;
+        private Instant createdAt;
+        private List<String> mentionedUserIds = new ArrayList<>();
+        private List<String> readBy = new ArrayList<>(); // User IDs who have read this comment/mention
     }
 }

@@ -63,4 +63,20 @@ public class TaskController {
         taskService.deleteTask(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/{id}/comments")
+    public ResponseEntity<Task> addComment(
+            @PathVariable String id,
+            @RequestBody Task.Comment comment,
+            Principal principal) {
+        return ResponseEntity.ok(taskService.addComment(id, comment, principal.getName()));
+    }
+
+    @PatchMapping("/{taskId}/comments/{commentId}/read")
+    public ResponseEntity<Task> markCommentAsRead(
+            @PathVariable String taskId,
+            @PathVariable String commentId,
+            Principal principal) {
+        return ResponseEntity.ok(taskService.markCommentAsRead(taskId, commentId, principal.getName()));
+    }
 }

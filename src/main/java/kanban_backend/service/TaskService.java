@@ -12,7 +12,9 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 @Service
 public class TaskService {
@@ -253,5 +255,48 @@ public class TaskService {
 
     public void deleteTask(String id) {
         taskRepository.deleteById(id);
+    }
+
+    public Task addComment(String taskId, Task.Comment comment, String userEmail) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found"));
+        User author = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        comment.setId(UUID.randomUUID().toString());
+        comment.setCreatedAt(Instant.now());
+        comment.setAuthorId(author.getId());
+        comment.setAuthorName(author.getName());
+        
+        if (comment.getMentionedUserIds() == null) {
+            comment.setMentionedUserIds(new ArrayList<>());
+        }
+        if (comment.getReadBy() == null) {
+            comment.setReadBy(new ArrayList<>());
+        }
+        
+        // Add author to readBy so they don't see their own comment as unread
+        comment.getReadBy().add(author.getId());
+
+        task.getComments().add(comment);
+        task.setUpdatedAt(Instant.now());
+        return taskRepository.save(task);
+    }
+
+    public Task markCommentAsRead(String taskId, String commentId, String userEmail) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found"));
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        task.getComments().forEach(c -> {
+            if (c.getId().equals(commentId)) {
+                if (!c.getReadBy().contains(user.getId())) {
+                    c.getReadBy().add(user.getId());
+                }
+            }
+        });
+
+        return taskRepository.save(task);
     }
 }
