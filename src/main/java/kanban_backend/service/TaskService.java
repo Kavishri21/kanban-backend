@@ -299,4 +299,47 @@ public class TaskService {
 
         return taskRepository.save(task);
     }
+
+    public Task updateComment(String taskId, String commentId, Task.Comment updates, String userEmail) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found"));
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        task.getComments().forEach(c -> {
+            if (c.getId().equals(commentId)) {
+                if (!c.getAuthorId().equals(user.getId())) {
+                    throw new RuntimeException("Unauthorized: You can only edit your own comments");
+                }
+                c.setText(updates.getText());
+                c.setMentionedUserIds(updates.getMentionedUserIds());
+            }
+        });
+
+        task.setUpdatedAt(Instant.now());
+        return taskRepository.save(task);
+    }
+
+    public Task deleteComment(String taskId, String commentId, String userEmail) {
+        Task task = taskRepository.findById(taskId)
+                .orElseThrow(() -> new RuntimeException("Task not found"));
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        boolean removed = task.getComments().removeIf(c -> {
+            if (c.getId().equals(commentId)) {
+                if (!c.getAuthorId().equals(user.getId())) {
+                    throw new RuntimeException("Unauthorized: You can only delete your own comments");
+                }
+                return true;
+            }
+            return false;
+        });
+
+        if (removed) {
+            task.setUpdatedAt(Instant.now());
+            return taskRepository.save(task);
+        }
+        return task;
+    }
 }
