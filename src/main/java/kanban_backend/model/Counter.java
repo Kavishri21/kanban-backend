@@ -16,7 +16,10 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public class Counter {
 
     @Id
-    private String prefix; // e.g. "MY", "TFR", "DEV"
+    private String id; // format: "PREFIX:CONTEXT_ID" (e.g., "MY:userid" or "DEV:teamid")
+
+    private String prefix;    // e.g. "MY", "TFR", "DEV"
+    private String contextId; // e.g. userId or teamId
 
     private long seq;
 }

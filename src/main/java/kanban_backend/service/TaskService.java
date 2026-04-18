@@ -55,11 +55,12 @@ public class TaskService {
     }
 
     /**
-     * Atomically increment and return the next sequence number for a given prefix.
+     * Atomically increment and return the next sequence number for a given prefix and context.
      */
-    private synchronized long getNextSequence(String prefix) {
-        Counter counter = counterRepository.findById(prefix)
-                .orElse(new Counter(prefix, 0L));
+    private synchronized long getNextSequence(String prefix, String contextId) {
+        String counterId = prefix + ":" + contextId;
+        Counter counter = counterRepository.findById(counterId)
+                .orElse(new Counter(counterId, prefix, contextId, 0L));
         counter.setSeq(counter.getSeq() + 1);
         counterRepository.save(counter);
         return counter.getSeq();
@@ -159,13 +160,16 @@ public class TaskService {
 
         // ── Generate Human-Readable Task ID ─────────────────────────────────
         String prefix;
+        String contextId;
         if (task.getTeamId() != null && !task.getTeamId().isBlank()) {
             Team teamForId = teamRepository.findById(task.getTeamId()).orElse(null);
             prefix = (teamForId != null) ? buildTeamPrefix(teamForId.getName()) : "MY";
+            contextId = task.getTeamId();
         } else {
             prefix = "MY";
+            contextId = creator.getId();
         }
-        long seq = getNextSequence(prefix);
+        long seq = getNextSequence(prefix, contextId);
         task.setTaskID(prefix + seq);
         // ────────────────────────────────────────────────────────────────────
 
