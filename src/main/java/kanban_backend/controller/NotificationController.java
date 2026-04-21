@@ -38,4 +38,16 @@ public class NotificationController {
         response.put("message", "All notifications marked as read");
         return ResponseEntity.ok(response);
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteNotification(@PathVariable String id, Authentication authentication) {
+        notificationService.deleteNotification(id, authentication.getName());
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/clear-all")
+    public ResponseEntity<Void> clearAllNotifications(Authentication authentication) {
+        notificationService.clearAllNotifications(authentication.getName());
+        return ResponseEntity.ok().build();
+    }
 }

@@ -66,4 +66,25 @@ public class NotificationService {
         unread.forEach(n -> n.setRead(true));
         notificationRepository.saveAll(unread);
     }
+    
+    public void deleteNotification(String id, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+                
+        Notification notification = notificationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Notification not found"));
+                
+        if (!notification.getRecipientId().equals(user.getId())) {
+             throw new RuntimeException("Unauthorized: You can only delete your own notifications.");
+        }
+
+        notificationRepository.delete(notification);
+    }
+
+    public void clearAllNotifications(String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+                
+        notificationRepository.deleteByRecipientId(user.getId());
+    }
 }
