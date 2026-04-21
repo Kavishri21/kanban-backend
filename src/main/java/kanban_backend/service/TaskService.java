@@ -24,15 +24,17 @@ public class TaskService {
     private final TeamRepository teamRepository;
     private final EmailService emailService;
     private final CounterRepository counterRepository;
+    private final NotificationService notificationService;
 
     public TaskService(TaskRepository taskRepository, UserRepository userRepository,
                        TeamRepository teamRepository, EmailService emailService,
-                       CounterRepository counterRepository) {
+                       CounterRepository counterRepository, NotificationService notificationService) {
         this.taskRepository = taskRepository;
         this.userRepository = userRepository;
         this.teamRepository = teamRepository;
         this.emailService = emailService;
         this.counterRepository = counterRepository;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -197,6 +199,16 @@ public class TaskService {
                     task.getPriority() != null ? task.getPriority() : "medium",
                     teamName
                 );
+                
+                // --- In-App Notification ---
+                notificationService.createNotification(
+                    assignee.getId(),
+                    creator.getId(),
+                    creator.getName(),
+                    "TASK_ASSIGNED",
+                    "assigned you a new task: " + task.getTitle(),
+                    savedTask.getId()
+                );
             } catch (Exception e) {
                 // Email is optional — task is already saved, just log the error
                 System.err.println("Could not send task assignment email: " + e.getMessage());
@@ -284,7 +296,23 @@ public class TaskService {
 
         task.getComments().add(comment);
         task.setUpdatedAt(Instant.now());
-        return taskRepository.save(task);
+        Task savedTask = taskRepository.save(task);
+
+        // --- Send Notifications for Mentions ---
+        if (comment.getMentionedUserIds() != null && !comment.getMentionedUserIds().isEmpty()) {
+            for (String mentionedUserId : comment.getMentionedUserIds()) {
+                notificationService.createNotification(
+                    mentionedUserId,
+                    author.getId(),
+                    author.getName(),
+                    "MENTION",
+                    "mentioned you in a comment on task: " + task.getTitle(),
+                    savedTask.getId()
+                );
+            }
+        }
+
+        return savedTask;
     }
 
     public Task markCommentAsRead(String taskId, String commentId, String userEmail) {

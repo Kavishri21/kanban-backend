@@ -13,11 +13,13 @@ public class TeamService {
     private final TeamRepository teamRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
+    private final NotificationService notificationService;
 
-    public TeamService(TeamRepository teamRepository, UserRepository userRepository, EmailService emailService) {
+    public TeamService(TeamRepository teamRepository, UserRepository userRepository, EmailService emailService, NotificationService notificationService) {
         this.teamRepository = teamRepository;
         this.userRepository = userRepository;
         this.emailService = emailService;
+        this.notificationService = notificationService;
     }
 
     public List<Team> getAllTeams(String requesterEmail) {
@@ -83,6 +85,16 @@ public class TeamService {
                     targetUser.getName(),
                     requester.getName(),
                     team.getName()
+                );
+                
+                // --- In-App Notification ---
+                notificationService.createNotification(
+                    targetUser.getId(),
+                    requester.getId(),
+                    requester.getName(),
+                    "TEAM_ADDED",
+                    "added you to the team: " + team.getName(),
+                    team.getId()
                 );
             }
         } catch (Exception e) {
