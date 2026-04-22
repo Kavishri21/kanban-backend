@@ -129,6 +129,12 @@ public class TaskService {
             }
         }
         
+        allTasks.forEach(t -> {
+            if (t.getPosition() == null) {
+                t.setPosition((double) t.getCreatedAt().toEpochMilli());
+            }
+        });
+        
         return allTasks;
     }
 
@@ -157,6 +163,9 @@ public class TaskService {
         task.setStatus("todo"); 
         task.setUserId(assignedToId); 
         task.setCreatedByUserId(creator.getId());
+        
+        // Initialize position based on current time to place at the end by default
+        task.setPosition((double) Instant.now().toEpochMilli());
 
         task.getStatusHistory().add(new Task.StatusHistory("todo", now, creator.getName(), null));
 
@@ -219,7 +228,7 @@ public class TaskService {
         return savedTask;
     }
 
-    public Task updateStatus(String id, String newStatus, String userEmail) {
+    public Task updateStatus(String id, String newStatus, Double newPosition, String userEmail) {
         Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Task not found: " + id));
         User user = userRepository.findByEmail(userEmail)
@@ -248,6 +257,10 @@ public class TaskService {
         Instant now = Instant.now();
         task.setStatus(newStatus);
         task.setUpdatedAt(now);
+        
+        if (newPosition != null) {
+            task.setPosition(newPosition);
+        }
 
         String historyReason = "backlog".equals(newStatus) ? task.getReason() : null;
         task.getStatusHistory().add(new Task.StatusHistory(newStatus, now, user.getName(), historyReason));

@@ -38,6 +38,8 @@ public class Task {
     private String userId;          // The assigned user
     private String createdByUserId; // Who created/assigned this task
 
+    private Double position;        // Order within priority group
+
 
     @Data
     @NoArgsConstructor

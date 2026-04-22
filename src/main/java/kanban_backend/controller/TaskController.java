@@ -37,15 +37,23 @@ public class TaskController {
     @PatchMapping("/{id}/status")
     public ResponseEntity<Task> updateStatus(
             @PathVariable String id,
-            @RequestBody Map<String, String> body,
+            @RequestBody Map<String, Object> body,
             Principal principal) {
 
-        String newStatus = body.get("status");
+        String newStatus = (String) body.get("status");
         if (newStatus == null || newStatus.isBlank()) {
             return ResponseEntity.badRequest().build();
         }
+        
+        Double newPosition = null;
+        if (body.containsKey("position")) {
+            Object pos = body.get("position");
+            if (pos instanceof Number) {
+                newPosition = ((Number) pos).doubleValue();
+            }
+        }
 
-        Task updated = taskService.updateStatus(id, newStatus, principal.getName());
+        Task updated = taskService.updateStatus(id, newStatus, newPosition, principal.getName());
         return ResponseEntity.ok(updated);
     }
 
