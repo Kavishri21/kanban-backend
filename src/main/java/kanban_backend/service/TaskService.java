@@ -68,36 +68,18 @@ public class TaskService {
         return counter.getSeq();
     }
 
-    public List<Task> getTasks(String userEmail, String teamId, boolean createdByMe) {
+    public List<Task> getTasks(String userEmail, String teamId, String targetUserId, boolean createdByMe) {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found"));
                 
         boolean isOrgAdmin = "ORG_ADMIN".equals(user.getGlobalRole());
+        boolean isManager = "MANAGER".equals(user.getGlobalRole());
         
         List<Task> allTasks;
-        if (teamId == null || teamId.isBlank()) {
-            if (isOrgAdmin) {
-                if (createdByMe) {
-                    allTasks = taskRepository.findAll().stream()
-                        .filter(t -> user.getId().equals(t.getCreatedByUserId()))
-                        .collect(Collectors.toList());
-                } else {
-                    allTasks = taskRepository.findAll();
-                }
-            } else {
-                // If no team specified, maybe finding tasks across all teams they are part of
-                // For safety, let's just return tasks they own or created
-                // Need to also combine tasks they created. MongoDB has no simple OR in MongoRepository without @Query unless we write one. Let's filter in memory if small, or just wait.
-                // It's better to expect teamId.
-                allTasks = taskRepository.findAll().stream()
-                    .filter(t -> {
-                        if (createdByMe) return user.getId().equals(t.getCreatedByUserId());
-                        return user.getId().equals(t.getUserId()) || user.getId().equals(t.getCreatedByUserId());
-                    })
-                    .collect(Collectors.toList());
-            }
-        } else {
-            // Verify team membership
+
+        if (teamId != null && !teamId.isBlank()) {
+            // --- TEAM CONTEXT ---
+            // Verify access
             if (!isOrgAdmin) {
                 Team team = teamRepository.findById(teamId).orElseThrow(() -> new RuntimeException("Team not found"));
                 boolean isMember = team.getMembers().stream().anyMatch(m -> m.getUserId().equals(user.getId()));
@@ -110,17 +92,59 @@ public class TaskService {
                 .filter(t -> teamId.equals(t.getTeamId()))
                 .collect(Collectors.toList());
                 
-            if (isOrgAdmin) {
-                if (createdByMe) {
-                    allTasks = teamTasks.stream()
-                        .filter(t -> user.getId().equals(t.getCreatedByUserId()))
-                        .collect(Collectors.toList());
-                } else {
-                    allTasks = teamTasks;
-                }
-            } else {
-                // The explicit user requirement: "should see only tasks that are creataed by him or assigned to him from higher level members and not the entire team tasks"
+            if (targetUserId != null && !targetUserId.isBlank()) {
+                // Fetching specific member's tasks within the team
                 allTasks = teamTasks.stream()
+                    .filter(t -> targetUserId.equals(t.getUserId()))
+                    .collect(Collectors.toList());
+            } else {
+                // Fetching team board
+                if (isOrgAdmin || isManager) {
+                    // Managers and Admins see ALL tasks in the team
+                    allTasks = teamTasks;
+                } else {
+                    // Regular employees see only their own tasks or tasks they created in the team
+                    allTasks = teamTasks.stream()
+                        .filter(t -> {
+                            if (createdByMe) return user.getId().equals(t.getCreatedByUserId());
+                            return user.getId().equals(t.getUserId()) || user.getId().equals(t.getCreatedByUserId());
+                        })
+                        .collect(Collectors.toList());
+                }
+            }
+        } else {
+            // --- NO TEAM SPECIFIED ---
+            if (targetUserId != null && !targetUserId.isBlank()) {
+                // Querying someone else's personal tasks
+                if (!isOrgAdmin && !isManager) {
+                    throw new RuntimeException("Unauthorized to view other users' personal tasks");
+                }
+                
+                if (isManager && !isOrgAdmin) {
+                    // Validate that the manager shares at least one team with the targetUser
+                    List<Team> allTeams = teamRepository.findAll();
+                    boolean sharesTeam = allTeams.stream().anyMatch(team -> 
+                        team.getMembers().stream().anyMatch(m -> m.getUserId().equals(user.getId())) &&
+                        team.getMembers().stream().anyMatch(m -> m.getUserId().equals(targetUserId))
+                    );
+                    if (!sharesTeam) {
+                        throw new RuntimeException("Unauthorized to view personal tasks of a user outside your teams");
+                    }
+                }
+                
+                allTasks = taskRepository.findAll().stream()
+                    .filter(t -> t.getTeamId() == null || t.getTeamId().isBlank())
+                    .filter(t -> targetUserId.equals(t.getUserId()))
+                    .collect(Collectors.toList());
+            } else {
+                // Querying own personal board
+                if (isOrgAdmin && !createdByMe) {
+                    // Admins querying empty board without createdByMe might just want everything
+                    // but usually frontend sends teamId=null to get "My Board".
+                    // Let's stick to returning their own tasks to avoid dumping the whole DB.
+                }
+                
+                allTasks = taskRepository.findAll().stream()
                     .filter(t -> {
                         if (createdByMe) return user.getId().equals(t.getCreatedByUserId());
                         return user.getId().equals(t.getUserId()) || user.getId().equals(t.getCreatedByUserId());

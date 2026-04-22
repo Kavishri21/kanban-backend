@@ -23,9 +23,10 @@ public class TaskController {
     @GetMapping
     public ResponseEntity<List<Task>> getAllTasks(
             @RequestParam(required = false) String teamId,
+            @RequestParam(required = false) String targetUserId,
             @RequestParam(required = false, defaultValue = "false") boolean createdByMe,
             Principal principal) {
-        return ResponseEntity.ok(taskService.getTasks(principal.getName(), teamId, createdByMe));
+        return ResponseEntity.ok(taskService.getTasks(principal.getName(), teamId, targetUserId, createdByMe));
     }
 
     @PostMapping
