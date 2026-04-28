@@ -2,8 +2,10 @@ package kanban_backend.service;
 
 import kanban_backend.model.Task;
 import kanban_backend.model.User;
+import kanban_backend.model.Team;
 import kanban_backend.repository.TaskRepository;
 import kanban_backend.repository.UserRepository;
+import kanban_backend.repository.TeamRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -13,10 +15,12 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final TaskRepository taskRepository;
+    private final TeamRepository teamRepository;
 
-    public UserService(UserRepository userRepository, TaskRepository taskRepository) {
+    public UserService(UserRepository userRepository, TaskRepository taskRepository, TeamRepository teamRepository) {
         this.userRepository = userRepository;
         this.taskRepository = taskRepository;
+        this.teamRepository = teamRepository;
     }
 
     private void verifyOrgAdmin(String requesterEmail) {
@@ -72,6 +76,24 @@ public class UserService {
             task.setUserId(null); // Mark as unassigned
         }
         taskRepository.saveAll(userTasks);
+
+        // Remove user from all teams they belong to
+        List<Team> userTeams = teamRepository.findByMembersUserId(id);
+        for (Team team : userTeams) {
+            Team.TeamMember member = team.getMembers().stream()
+                .filter(m -> m.getUserId().equals(id))
+                .findFirst()
+                .orElse(null);
+                
+            if (member != null && "LEAD".equals(member.getTeamRole())) {
+                long leadCount = team.getMembers().stream().filter(m -> "LEAD".equals(m.getTeamRole())).count();
+                if (leadCount <= 1) {
+                    throw new RuntimeException("Cannot delete user. They are the only LEAD of team: '" + team.getName() + "'. Promote another member to LEAD first.");
+                }
+            }
+            team.getMembers().removeIf(m -> m.getUserId().equals(id));
+        }
+        teamRepository.saveAll(userTeams);
 
         userRepository.deleteById(id);
     }

@@ -7,4 +7,5 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface TaskRepository extends MongoRepository<Task, String> {
     java.util.List<Task> findByUserId(String userId);
+    java.util.List<Task> findByTeamId(String teamId);
 }

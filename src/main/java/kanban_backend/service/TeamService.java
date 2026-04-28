@@ -2,8 +2,10 @@ package kanban_backend.service;
 
 import kanban_backend.model.Team;
 import kanban_backend.model.User;
+import kanban_backend.model.Task;
 import kanban_backend.repository.TeamRepository;
 import kanban_backend.repository.UserRepository;
+import kanban_backend.repository.TaskRepository;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
@@ -14,12 +16,14 @@ public class TeamService {
     private final UserRepository userRepository;
     private final EmailService emailService;
     private final NotificationService notificationService;
+    private final TaskRepository taskRepository;
 
-    public TeamService(TeamRepository teamRepository, UserRepository userRepository, EmailService emailService, NotificationService notificationService) {
+    public TeamService(TeamRepository teamRepository, UserRepository userRepository, EmailService emailService, NotificationService notificationService, TaskRepository taskRepository) {
         this.teamRepository = teamRepository;
         this.userRepository = userRepository;
         this.emailService = emailService;
         this.notificationService = notificationService;
+        this.taskRepository = taskRepository;
     }
 
     public List<Team> getAllTeams(String requesterEmail) {
@@ -187,6 +191,14 @@ public class TeamService {
 
     public void deleteTeam(String teamId) {
         teamRepository.findById(teamId).orElseThrow(() -> new RuntimeException("Team not found"));
+        
+        // Convert all team tasks to personal tasks
+        List<Task> teamTasks = taskRepository.findByTeamId(teamId);
+        for (Task task : teamTasks) {
+            task.setTeamId(null);
+        }
+        taskRepository.saveAll(teamTasks);
+
         teamRepository.deleteById(teamId);
     }
 }
