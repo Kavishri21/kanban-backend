@@ -16,6 +16,12 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.ArrayList;
 
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+
 @Service
 public class TaskService {
 
@@ -25,16 +31,19 @@ public class TaskService {
     private final EmailService emailService;
     private final CounterRepository counterRepository;
     private final NotificationService notificationService;
+    private final MongoTemplate mongoTemplate;
 
     public TaskService(TaskRepository taskRepository, UserRepository userRepository,
                        TeamRepository teamRepository, EmailService emailService,
-                       CounterRepository counterRepository, NotificationService notificationService) {
+                       CounterRepository counterRepository, NotificationService notificationService,
+                       MongoTemplate mongoTemplate) {
         this.taskRepository = taskRepository;
         this.userRepository = userRepository;
         this.teamRepository = teamRepository;
         this.emailService = emailService;
         this.counterRepository = counterRepository;
         this.notificationService = notificationService;
+        this.mongoTemplate = mongoTemplate;
     }
 
     /**
@@ -58,14 +67,22 @@ public class TaskService {
 
     /**
      * Atomically increment and return the next sequence number for a given prefix and context.
+     * Uses MongoDB's findAndModify to ensure thread-safety across multiple instances.
      */
-    private synchronized long getNextSequence(String prefix, String contextId) {
+    private long getNextSequence(String prefix, String contextId) {
         String counterId = prefix + ":" + contextId;
-        Counter counter = counterRepository.findById(counterId)
-                .orElse(new Counter(counterId, prefix, contextId, 0L));
-        counter.setSeq(counter.getSeq() + 1);
-        counterRepository.save(counter);
-        return counter.getSeq();
+        
+        Query query = new Query(Criteria.where("_id").is(counterId));
+        Update update = new Update()
+                .inc("seq", 1)
+                .setOnInsert("prefix", prefix)
+                .setOnInsert("contextId", contextId);
+                
+        FindAndModifyOptions options = new FindAndModifyOptions().returnNew(true).upsert(true);
+        
+        Counter counter = mongoTemplate.findAndModify(query, update, options, Counter.class);
+        
+        return counter != null ? counter.getSeq() : 1L;
     }
 
     public List<Task> getTasks(String userEmail, String teamId, String targetUserId, boolean createdByMe) {
