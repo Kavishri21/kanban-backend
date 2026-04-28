@@ -6,7 +6,6 @@ import kanban_backend.model.Counter;
 import kanban_backend.repository.TaskRepository;
 import kanban_backend.repository.UserRepository;
 import kanban_backend.repository.TeamRepository;
-import kanban_backend.repository.CounterRepository;
 import kanban_backend.model.Team;
 import org.springframework.stereotype.Service;
 
@@ -29,19 +28,17 @@ public class TaskService {
     private final UserRepository userRepository;
     private final TeamRepository teamRepository;
     private final EmailService emailService;
-    private final CounterRepository counterRepository;
     private final NotificationService notificationService;
     private final MongoTemplate mongoTemplate;
 
     public TaskService(TaskRepository taskRepository, UserRepository userRepository,
                        TeamRepository teamRepository, EmailService emailService,
-                       CounterRepository counterRepository, NotificationService notificationService,
+                       NotificationService notificationService,
                        MongoTemplate mongoTemplate) {
         this.taskRepository = taskRepository;
         this.userRepository = userRepository;
         this.teamRepository = teamRepository;
         this.emailService = emailService;
-        this.counterRepository = counterRepository;
         this.notificationService = notificationService;
         this.mongoTemplate = mongoTemplate;
     }
